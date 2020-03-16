@@ -1,4 +1,4 @@
-// http://geoexamples.com/d3-composite-projections/ v1.3.1 Copyright 2019 Roger Veciana i Rovira
+// http://geoexamples.com/d3-composite-projections/ v1.3.2 Copyright 2020 Roger Veciana i Rovira
 (function (global, factory) {
 typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('d3-geo'), require('d3-path')) :
 typeof define === 'function' && define.amd ? define(['exports', 'd3-geo', 'd3-path'], factory) :
@@ -567,14 +567,14 @@ function conicConformalSpain() {
       var canaryIslandsBbox = [[-19.0, 28.85], [-12.7, 28.1]];
       */
 
-  function conicConformalSpain(coordinates) {
+  function conicConformalSpainCompact(coordinates) {
     var x = coordinates[0], y = coordinates[1];
     return point = null,
         (iberianPeninsulePoint.point(x, y), point) ||
         (canaryIslandsPoint.point(x, y), point);
   }
 
-  conicConformalSpain.invert = function(coordinates) {
+  conicConformalSpainCompact.invert = function(coordinates) {
     var k = iberianPeninsule.scale(),
         t = iberianPeninsule.translate(),
         x = (coordinates[0] - t[0]) / k,
@@ -584,25 +584,25 @@ function conicConformalSpain() {
             : iberianPeninsule).invert(coordinates);
   };
 
-  conicConformalSpain.stream = function(stream) {
+  conicConformalSpainCompact.stream = function(stream) {
     return cache && cacheStream === stream ? cache : cache = multiplex$2([iberianPeninsule.stream(cacheStream = stream), canaryIslands.stream(stream)]);
   };
 
-  conicConformalSpain.precision = function(_) {
+  conicConformalSpainCompact.precision = function(_) {
     if (!arguments.length) {return iberianPeninsule.precision();}
     iberianPeninsule.precision(_);
     canaryIslands.precision(_);
     return reset();
   };
 
-  conicConformalSpain.scale = function(_) {
+  conicConformalSpainCompact.scale = function(_) {
     if (!arguments.length) {return iberianPeninsule.scale();}
     iberianPeninsule.scale(_);
     canaryIslands.scale(_);
-    return conicConformalSpain.translate(iberianPeninsule.translate());
+    return conicConformalSpainCompact.translate(iberianPeninsule.translate());
   };
 
-  conicConformalSpain.translate = function(_) {
+  conicConformalSpainCompact.translate = function(_) {
     if (!arguments.length) {return iberianPeninsule.translate();}
     var k = iberianPeninsule.scale(), x = +_[0], y = +_[1];
     /*
@@ -639,20 +639,20 @@ function conicConformalSpain() {
     return reset();
   };
 
-  conicConformalSpain.fitExtent = function(extent, object) {
-    return fitExtent(conicConformalSpain, extent, object);
+  conicConformalSpainCompact.fitExtent = function(extent, object) {
+    return fitExtent(conicConformalSpainCompact, extent, object);
   };
 
-  conicConformalSpain.fitSize = function(size, object) {
-    return fitSize(conicConformalSpain, size, object);
+  conicConformalSpainCompact.fitSize = function(size, object) {
+    return fitSize(conicConformalSpainCompact, size, object);
   };
 
   function reset() {
     cache = cacheStream = null;
-    return conicConformalSpain;
+    return conicConformalSpainCompact;
   }
 
-  conicConformalSpain.drawCompositionBorders = function(context) {
+  conicConformalSpainCompact.drawCompositionBorders = function(context) {
     /*
     console.info("CLIP EXTENT: ", canaryIslands.clipExtent());
     console.info("UL BBOX:", iberianPeninsule.invert([canaryIslands.clipExtent()[0][0], canaryIslands.clipExtent()[0][1]]));
@@ -668,8 +668,175 @@ function conicConformalSpain() {
     context.lineTo(urCanaryIslands[0], urCanaryIslands[1]);
     context.lineTo(ldCanaryIslands[0], ldCanaryIslands[1]);
   };
-  conicConformalSpain.getCompositionBorders = function() {
+  conicConformalSpainCompact.getCompositionBorders = function() {
     var context = d3Path.path();
+    this.drawCompositionBorders(context);
+    return context.toString();
+  };
+
+  return conicConformalSpainCompact.scale(2700);
+}
+
+// The projections must have mutually exclusive clip regions on the sphere,
+// as this will avoid emitting interleaving lines and polygons.
+function multiplex$3(streams) {
+  var n = streams.length;
+  return {
+    point: function(x, y) {
+      var i = -1;
+      while (++i < n) {
+        streams[i].point(x, y);
+      }
+    },
+    sphere: function() {
+      var i = -1;
+      while (++i < n) {
+        streams[i].sphere();
+      }
+    },
+    lineStart: function() {
+      var i = -1;
+      while (++i < n) {
+        streams[i].lineStart();
+      }
+    },
+    lineEnd: function() {
+      var i = -1;
+      while (++i < n) {
+        streams[i].lineEnd();
+      }
+    },
+    polygonStart: function() {
+      var i = -1;
+      while (++i < n) {
+        streams[i].polygonStart();
+      }
+    },
+    polygonEnd: function() {
+      var i = -1;
+      while (++i < n) {
+        streams[i].polygonEnd();
+      }
+    }
+  };
+}
+
+// A composite projection for Spain, configured by default for 960×500.
+function conicConformalSpainCompact() {
+  var cache,
+    cacheStream,
+    peninsula = d3Geo.geoConicConformal()
+      .rotate([5, -38.6])
+      .parallels([0, 60]),
+    peninsulaPoint,
+    canarias = d3Geo.geoConicConformal()
+      .rotate([5, -38.6])
+      .parallels([0, 60]),
+    canariasPoint,
+    point,
+    pointStream = {
+      point: function(x, y) {
+        point = [x, y];
+      }
+    };
+
+  function conicConformalSpain(coordinates) {
+    var x = coordinates[0],
+      y = coordinates[1];
+    return (
+      (point = null),
+      (peninsulaPoint.point(x, y), point) || (canariasPoint.point(x, y), point)
+    );
+  }
+
+  conicConformalSpain.invert = function(coordinates) {
+    var k = peninsula.scale(),
+      t = peninsula.translate(),
+      x = (coordinates[0] - t[0]) / k,
+      y = (coordinates[1] - t[1]) / k;
+    return (y >= clipY0 && y < clipY1 && x >= -clipX0 && x < -clipX1
+      ? canarias
+      : peninsula
+    ).invert(coordinates);
+  };
+
+  conicConformalSpain.stream = function(stream) {
+    return cache && cacheStream === stream
+      ? cache
+      : (cache = multiplex$3([
+          peninsula.stream((cacheStream = stream)),
+          canarias.stream(stream)
+        ]));
+  };
+
+  conicConformalSpain.precision = function(_) {
+    if (!arguments.length) return peninsula.precision();
+    peninsula.precision(_), canarias.precision(_);
+    return reset();
+  };
+
+  conicConformalSpain.scale = function(_) {
+    if (!arguments.length) {
+      return peninsula.scale();
+    }
+    peninsula.scale(_);
+    canarias.scale(_);
+    return conicConformalSpain.translate(peninsula.translate());
+  };
+
+  conicConformalSpain.translate = function(_) {
+    if (!arguments.length) return peninsula.translate();
+    var k = peninsula.scale(),
+      x = +_[0],
+      y = +_[1];
+
+    peninsulaPoint = peninsula
+      .translate(_)
+      .clipExtent([
+        [x - 0.06857 * k, y - 0.1288 * k],
+        [x + 0.13249 * k, y + 0.1 * k]
+      ])
+      .stream(pointStream);
+
+    canariasPoint = canarias
+      .translate([x + 0.178 * k, y - 0.085 * k])
+      .clipExtent([
+        [x - 0.053 * k + epsilon, y + 0.062 * k + epsilon],
+        [x - -0.044 * k - epsilon, y + 0.1 * k - epsilon]
+      ])
+      .stream(pointStream);
+
+    return reset();
+  };
+
+  conicConformalSpain.fitExtent = function(extent, object) {
+    return fitExtent(conicConformalSpain, extent, object);
+  };
+
+  conicConformalSpain.fitSize = function(size, object) {
+    return fitSize(conicConformalSpain, size, object);
+  };
+
+  function reset() {
+    cache = cacheStream = null;
+    return conicConformalSpain;
+  }
+
+  conicConformalSpain.drawCompositionBorders = function(context) {
+    const extent = canarias.clipExtent();
+    const ul = peninsula.invert([extent[0][0], extent[0][1]]);
+    const ur = peninsula.invert([extent[1][0], extent[0][1]]);
+    const ld = peninsula.invert([extent[1][0], extent[1][1]]);
+    const ulCanaryIslands = peninsula(ul);
+    const urCanaryIslands = peninsula(ur);
+    const ldCanaryIslands = peninsula(ld);
+
+    context.moveTo(ulCanaryIslands[0], ulCanaryIslands[1]);
+    context.lineTo(urCanaryIslands[0], urCanaryIslands[1]);
+    context.lineTo(ldCanaryIslands[0], ldCanaryIslands[1]);
+  };
+  conicConformalSpain.getCompositionBorders = function() {
+    const context = d3Path.path();
     this.drawCompositionBorders(context);
     return context.toString();
   };
@@ -679,7 +846,7 @@ function conicConformalSpain() {
 
 // The projections must have mutually exclusive clip regions on the sphere,
 // as this will avoid emitting interleaving lines and polygons.
-function multiplex$3(streams) {
+function multiplex$4(streams) {
   var n = streams.length;
   return {
     point: function(x, y) { var i = -1; while (++i < n) {streams[i].point(x, y); }},
@@ -756,7 +923,7 @@ function conicConformalPortugal() {
   };
 
   conicConformalPortugal.stream = function(stream) {
-    return cache && cacheStream === stream ? cache : cache = multiplex$3([iberianPeninsule.stream(cacheStream = stream), madeira.stream(stream), azores.stream(stream)]);
+    return cache && cacheStream === stream ? cache : cache = multiplex$4([iberianPeninsule.stream(cacheStream = stream), madeira.stream(stream), azores.stream(stream)]);
   };
 
   conicConformalPortugal.precision = function(_) {
@@ -919,7 +1086,7 @@ function conicConformalPortugal() {
 
 // The projections must have mutually exclusive clip regions on the sphere,
 // as this will avoid emitting interleaving lines and polygons.
-function multiplex$4(streams) {
+function multiplex$5(streams) {
   var n = streams.length;
   return {
     point: function(x, y) { var i = -1; while (++i < n) {streams[i].point(x, y); }},
@@ -978,7 +1145,7 @@ function mercatorEcuador() {
   };
 
   mercatorEcuador.stream = function(stream) {
-    return cache && cacheStream === stream ? cache : cache = multiplex$4([mainland.stream(cacheStream = stream), galapagos.stream(stream)]);
+    return cache && cacheStream === stream ? cache : cache = multiplex$5([mainland.stream(cacheStream = stream), galapagos.stream(stream)]);
   };
 
   mercatorEcuador.precision = function(_) {
@@ -1095,7 +1262,7 @@ function mercatorEcuador() {
 
 // The projections must have mutually exclusive clip regions on the sphere,
 // as this will avoid emitting interleaving lines and polygons.
-function multiplex$5(streams) {
+function multiplex$6(streams) {
   var n = streams.length;
   return {
     point: function(x, y) { var i = -1; while (++i < n) {streams[i].point(x, y); }},
@@ -1187,7 +1354,7 @@ function transverseMercatorChile() {
   };
 
   transverseMercatorChile.stream = function(stream) {
-    return cache && cacheStream === stream ? cache : cache = multiplex$5([mainland.stream(cacheStream = stream), antarctic.stream(stream), juanFernandez.stream(stream), pascua.stream(stream)]);
+    return cache && cacheStream === stream ? cache : cache = multiplex$6([mainland.stream(cacheStream = stream), antarctic.stream(stream), juanFernandez.stream(stream), pascua.stream(stream)]);
   };
 
   transverseMercatorChile.precision = function(_) {
@@ -1395,7 +1562,7 @@ function transverseMercatorChile() {
 
 // The projections must have mutually exclusive clip regions on the sphere,
 // as this will avoid emitting interleaving lines and polygons.
-function multiplex$6(streams) {
+function multiplex$7(streams) {
   var n = streams.length;
   return {
     point: function(x, y) { var i = -1; while (++i < n) {streams[i].point(x, y); }},
@@ -1473,7 +1640,7 @@ function conicEquidistantJapan() {
   };
 
   conicEquidistantJapan.stream = function(stream) {
-    return cache && cacheStream === stream ? cache : cache = multiplex$6([mainland.stream(cacheStream = stream), hokkaido.stream(stream), okinawa.stream(stream)]);
+    return cache && cacheStream === stream ? cache : cache = multiplex$7([mainland.stream(cacheStream = stream), hokkaido.stream(stream), okinawa.stream(stream)]);
   };
 
   conicEquidistantJapan.precision = function(_) {
@@ -1630,7 +1797,7 @@ function conicEquidistantJapan() {
 
 // The projections must have mutually exclusive clip regions on the sphere,
 // as this will avoid emitting interleaving lines and polygons.
-function multiplex$7(streams) {
+function multiplex$8(streams) {
   var n = streams.length;
   return {
     point: function(x, y) { var i = -1; while (++i < n) {streams[i].point(x, y); }},
@@ -1703,7 +1870,7 @@ function conicConformalFrance() {
   };
 
   conicConformalFrance.stream = function(stream) {
-    return cache && cacheStream === stream ? cache : cache = multiplex$7([europe.stream(cacheStream = stream), guyane.stream(stream), martinique.stream(stream), guadeloupe.stream(stream), saintBarthelemy.stream(stream), stPierreMiquelon.stream(stream), mayotte.stream(stream), reunion.stream(stream), nouvelleCaledonie.stream(stream), wallisFutuna.stream(stream), polynesie.stream(stream), polynesie2.stream(stream)]);
+    return cache && cacheStream === stream ? cache : cache = multiplex$8([europe.stream(cacheStream = stream), guyane.stream(stream), martinique.stream(stream), guadeloupe.stream(stream), saintBarthelemy.stream(stream), stPierreMiquelon.stream(stream), mayotte.stream(stream), reunion.stream(stream), nouvelleCaledonie.stream(stream), wallisFutuna.stream(stream), polynesie.stream(stream), polynesie2.stream(stream)]);
   };
 
   conicConformalFrance.precision = function(_) {
@@ -1957,7 +2124,7 @@ function conicConformalFrance() {
 
 // The projections must have mutually exclusive clip regions on the sphere,
 // as this will avoid emitting interleaving lines and polygons.
-function multiplex$8(streams) {
+function multiplex$9(streams) {
   var n = streams.length;
   return {
     point: function(x, y) { var i = -1; while (++i < n) {streams[i].point(x, y); }},
@@ -2037,7 +2204,7 @@ function conicConformalEurope() {
   };
 
   conicConformalEurope.stream = function(stream) {
-    return cache && cacheStream === stream ? cache : cache = multiplex$8([europe.stream(cacheStream = stream), guyane.stream(stream), martinique.stream(stream), guadeloupe.stream(stream), canaryIslands.stream(stream), madeira.stream(stream), mayotte.stream(stream), reunion.stream(stream), malta.stream(stream), azores.stream(stream), azores2.stream(stream), azores3.stream(stream)]);
+    return cache && cacheStream === stream ? cache : cache = multiplex$9([europe.stream(cacheStream = stream), guyane.stream(stream), martinique.stream(stream), guadeloupe.stream(stream), canaryIslands.stream(stream), madeira.stream(stream), mayotte.stream(stream), reunion.stream(stream), malta.stream(stream), azores.stream(stream), azores2.stream(stream), azores3.stream(stream)]);
   };
 
   conicConformalEurope.precision = function(_) {
@@ -2300,7 +2467,7 @@ function conicConformalEurope() {
 
 // The projections must have mutually exclusive clip regions on the sphere,
 // as this will avoid emitting interleaving lines and polygons.
-function multiplex$9(streams) {
+function multiplex$a(streams) {
   var n = streams.length;
   return {
     point: function(x, y) { var i = -1; while (++i < n) {streams[i].point(x, y); }},
@@ -2341,7 +2508,7 @@ function mercatorMalaysia() {
   };
 
   mercatorMalaysia.stream = function(stream) {
-    return cache && cacheStream === stream ? cache : cache = multiplex$9([peninsular.stream(cacheStream = stream), borneo.stream(stream)]);
+    return cache && cacheStream === stream ? cache : cache = multiplex$a([peninsular.stream(cacheStream = stream), borneo.stream(stream)]);
   };
 
   mercatorMalaysia.precision = function(_) {
@@ -2412,7 +2579,7 @@ function mercatorMalaysia() {
 
 // The projections must have mutually exclusive clip regions on the sphere,
 // as this will avoid emitting interleaving lines and polygons.
-function multiplex$a(streams) {
+function multiplex$b(streams) {
   var n = streams.length;
   return {
     point: function(x, y) { var i = -1; while (++i < n) {streams[i].point(x, y); }},
@@ -2453,7 +2620,7 @@ function mercatorEquatorialGuinea() {
   };
 
   mercatorEquatorialGuinea.stream = function(stream) {
-    return cache && cacheStream === stream ? cache : cache = multiplex$a([continent.stream(cacheStream = stream), bioko.stream(stream), annobon.stream(stream)]);
+    return cache && cacheStream === stream ? cache : cache = multiplex$b([continent.stream(cacheStream = stream), bioko.stream(stream), annobon.stream(stream)]);
   };
 
   mercatorEquatorialGuinea.precision = function(_) {
@@ -2569,7 +2736,7 @@ function mercatorEquatorialGuinea() {
   return mercatorEquatorialGuinea.scale(12000);
 }
 
-function multiplex$b(streams) {
+function multiplex$c(streams) {
   var n = streams.length;
   return {
     point: function(x, y) {
@@ -2642,7 +2809,7 @@ function albersUk() {
   albersUk.stream = function(stream) {
     return cache && cacheStream === stream
       ? cache
-      : (cache = multiplex$b([
+      : (cache = multiplex$c([
           main.stream((cacheStream = stream)),
           shetland.stream(stream)
         ]));
@@ -2754,6 +2921,7 @@ exports.geoConicConformalEurope = conicConformalEurope;
 exports.geoConicConformalFrance = conicConformalFrance;
 exports.geoConicConformalPortugal = conicConformalPortugal;
 exports.geoConicConformalSpain = conicConformalSpain;
+exports.geoConicConformalSpainCompact = conicConformalSpainCompact;
 exports.geoConicEquidistantJapan = conicEquidistantJapan;
 exports.geoMercatorEcuador = mercatorEcuador;
 exports.geoMercatorEquatorialGuinea = mercatorEquatorialGuinea;

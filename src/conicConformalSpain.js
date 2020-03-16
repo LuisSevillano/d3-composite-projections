@@ -33,14 +33,14 @@ export default function() {
       var canaryIslandsBbox = [[-19.0, 28.85], [-12.7, 28.1]];
       */
 
-  function conicConformalSpain(coordinates) {
+  function conicConformalSpainCompact(coordinates) {
     var x = coordinates[0], y = coordinates[1];
     return point = null,
         (iberianPeninsulePoint.point(x, y), point) ||
         (canaryIslandsPoint.point(x, y), point);
   }
 
-  conicConformalSpain.invert = function(coordinates) {
+  conicConformalSpainCompact.invert = function(coordinates) {
     var k = iberianPeninsule.scale(),
         t = iberianPeninsule.translate(),
         x = (coordinates[0] - t[0]) / k,
@@ -50,25 +50,25 @@ export default function() {
             : iberianPeninsule).invert(coordinates);
   };
 
-  conicConformalSpain.stream = function(stream) {
+  conicConformalSpainCompact.stream = function(stream) {
     return cache && cacheStream === stream ? cache : cache = multiplex([iberianPeninsule.stream(cacheStream = stream), canaryIslands.stream(stream)]);
   };
 
-  conicConformalSpain.precision = function(_) {
+  conicConformalSpainCompact.precision = function(_) {
     if (!arguments.length) {return iberianPeninsule.precision();}
     iberianPeninsule.precision(_);
     canaryIslands.precision(_);
     return reset();
   };
 
-  conicConformalSpain.scale = function(_) {
+  conicConformalSpainCompact.scale = function(_) {
     if (!arguments.length) {return iberianPeninsule.scale();}
     iberianPeninsule.scale(_);
     canaryIslands.scale(_);
-    return conicConformalSpain.translate(iberianPeninsule.translate());
+    return conicConformalSpainCompact.translate(iberianPeninsule.translate());
   };
 
-  conicConformalSpain.translate = function(_) {
+  conicConformalSpainCompact.translate = function(_) {
     if (!arguments.length) {return iberianPeninsule.translate();}
     var k = iberianPeninsule.scale(), x = +_[0], y = +_[1];
     /*
@@ -105,20 +105,20 @@ export default function() {
     return reset();
   };
 
-  conicConformalSpain.fitExtent = function(extent, object) {
-    return fitExtent(conicConformalSpain, extent, object);
+  conicConformalSpainCompact.fitExtent = function(extent, object) {
+    return fitExtent(conicConformalSpainCompact, extent, object);
   };
 
-  conicConformalSpain.fitSize = function(size, object) {
-    return fitSize(conicConformalSpain, size, object);
+  conicConformalSpainCompact.fitSize = function(size, object) {
+    return fitSize(conicConformalSpainCompact, size, object);
   };
 
   function reset() {
     cache = cacheStream = null;
-    return conicConformalSpain;
+    return conicConformalSpainCompact;
   }
 
-  conicConformalSpain.drawCompositionBorders = function(context) {
+  conicConformalSpainCompact.drawCompositionBorders = function(context) {
     /*
     console.info("CLIP EXTENT: ", canaryIslands.clipExtent());
     console.info("UL BBOX:", iberianPeninsule.invert([canaryIslands.clipExtent()[0][0], canaryIslands.clipExtent()[0][1]]));
@@ -134,11 +134,11 @@ export default function() {
     context.lineTo(urCanaryIslands[0], urCanaryIslands[1]);
     context.lineTo(ldCanaryIslands[0], ldCanaryIslands[1]);
   };
-  conicConformalSpain.getCompositionBorders = function() {
+  conicConformalSpainCompact.getCompositionBorders = function() {
     var context = path();
     this.drawCompositionBorders(context);
     return context.toString();
   };
 
-  return conicConformalSpain.scale(2700);
+  return conicConformalSpainCompact.scale(2700);
 }
