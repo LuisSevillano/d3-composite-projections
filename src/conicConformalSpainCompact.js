@@ -1,6 +1,6 @@
 import { epsilon } from "./math";
 import { geoConicConformal as conicConformal } from "d3-geo";
-import { fitExtent, fitSize } from "./fit";
+import { fitExtent, fitSize, fitWidth, fitHeight } from "./fit.js";
 import { path } from "d3-path";
 
 // The projections must have mutually exclusive clip regions on the sphere,
@@ -66,7 +66,7 @@ export default function() {
       }
     };
 
-  function conicConformalSpain(coordinates) {
+  function conicConformalSpainCompact(coordinates) {
     var x = coordinates[0],
       y = coordinates[1];
     return (
@@ -75,7 +75,7 @@ export default function() {
     );
   }
 
-  conicConformalSpain.invert = function(coordinates) {
+  conicConformalSpainCompact.invert = function(coordinates) {
     var k = peninsula.scale(),
       t = peninsula.translate(),
       x = (coordinates[0] - t[0]) / k,
@@ -86,7 +86,7 @@ export default function() {
     ).invert(coordinates);
   };
 
-  conicConformalSpain.stream = function(stream) {
+  conicConformalSpainCompact.stream = function(stream) {
     return cache && cacheStream === stream
       ? cache
       : (cache = multiplex([
@@ -95,22 +95,22 @@ export default function() {
         ]));
   };
 
-  conicConformalSpain.precision = function(_) {
+  conicConformalSpainCompact.precision = function(_) {
     if (!arguments.length) return peninsula.precision();
     peninsula.precision(_), canarias.precision(_);
     return reset();
   };
 
-  conicConformalSpain.scale = function(_) {
+  conicConformalSpainCompact.scale = function(_) {
     if (!arguments.length) {
       return peninsula.scale();
     }
     peninsula.scale(_);
     canarias.scale(_);
-    return conicConformalSpain.translate(peninsula.translate());
+    return conicConformalSpainCompact.translate(peninsula.translate());
   };
 
-  conicConformalSpain.translate = function(_) {
+  conicConformalSpainCompact.translate = function(_) {
     if (!arguments.length) return peninsula.translate();
     var k = peninsula.scale(),
       x = +_[0],
@@ -135,20 +135,28 @@ export default function() {
     return reset();
   };
 
-  conicConformalSpain.fitExtent = function(extent, object) {
-    return fitExtent(conicConformalSpain, extent, object);
+  conicConformalSpainCompact.fitExtent = function(extent, object) {
+    return fitExtent(conicConformalSpainCompact, extent, object);
   };
 
-  conicConformalSpain.fitSize = function(size, object) {
-    return fitSize(conicConformalSpain, size, object);
+  conicConformalSpainCompact.fitSize = function(size, object) {
+    return fitSize(conicConformalSpainCompact, size, object);
+  };
+
+  conicConformalSpainCompact.fitWidth = function(width, object) {
+    return fitWidth(conicConformalSpainCompact, width, object);
+  };
+
+  conicConformalSpainCompact.fitHeight = function(height, object) {
+    return fitHeight(conicConformalSpainCompact, height, object);
   };
 
   function reset() {
     cache = cacheStream = null;
-    return conicConformalSpain;
+    return conicConformalSpainCompact;
   }
 
-  conicConformalSpain.drawCompositionBorders = function(context) {
+  conicConformalSpainCompact.drawCompositionBorders = function(context) {
     const extent = canarias.clipExtent();
     const ul = peninsula.invert([extent[0][0], extent[0][1]]);
     const ur = peninsula.invert([extent[1][0], extent[0][1]]);
@@ -161,11 +169,11 @@ export default function() {
     context.lineTo(urCanaryIslands[0], urCanaryIslands[1]);
     context.lineTo(ldCanaryIslands[0], ldCanaryIslands[1]);
   };
-  conicConformalSpain.getCompositionBorders = function() {
+  conicConformalSpainCompact.getCompositionBorders = function() {
     const context = path();
     this.drawCompositionBorders(context);
     return context.toString();
   };
 
-  return conicConformalSpain.scale(2700);
+  return conicConformalSpainCompact.scale(2700);
 }

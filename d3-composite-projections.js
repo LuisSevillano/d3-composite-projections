@@ -34,33 +34,61 @@ function boundsPoint(x, y) {
   if (y > y1) y1 = y;
 }
 
-function fitExtent(projection, extent, object) {
-  var w = extent[1][0] - extent[0][0],
-      h = extent[1][1] - extent[0][1],
-      clip = projection.clipExtent && projection.clipExtent();
-
-  projection
-      .scale(150)
-      .translate([0, 0]);
-
+function fit(projection, fitBounds, object) {
+  var clip = projection.clipExtent && projection.clipExtent();
+  projection.scale(150).translate([0, 0]);
   if (clip != null) projection.clipExtent(null);
-
   d3Geo.geoStream(object, projection.stream(boundsStream));
-
-  var b = boundsStream.result(),
-      k = Math.min(w / (b[1][0] - b[0][0]), h / (b[1][1] - b[0][1])),
-      x = +extent[0][0] + (w - k * (b[1][0] + b[0][0])) / 2,
-      y = +extent[0][1] + (h - k * (b[1][1] + b[0][1])) / 2;
-
+  fitBounds(boundsStream.result());
   if (clip != null) projection.clipExtent(clip);
+  return projection;
+}
 
-  return projection
-      .scale(k * 150)
-      .translate([x, y]);
+function fitExtent(projection, extent, object) {
+  return fit(
+    projection,
+    function(b) {
+      var w = extent[1][0] - extent[0][0],
+        h = extent[1][1] - extent[0][1],
+        k = Math.min(w / (b[1][0] - b[0][0]), h / (b[1][1] - b[0][1])),
+        x = +extent[0][0] + (w - k * (b[1][0] + b[0][0])) / 2,
+        y = +extent[0][1] + (h - k * (b[1][1] + b[0][1])) / 2;
+      projection.scale(150 * k).translate([x, y]);
+    },
+    object
+  );
 }
 
 function fitSize(projection, size, object) {
   return fitExtent(projection, [[0, 0], size], object);
+}
+
+function fitWidth(projection, width, object) {
+  return fit(
+    projection,
+    function(b) {
+      var w = +width,
+        k = w / (b[1][0] - b[0][0]),
+        x = (w - k * (b[1][0] + b[0][0])) / 2,
+        y = -k * b[0][1];
+      projection.scale(150 * k).translate([x, y]);
+    },
+    object
+  );
+}
+
+function fitHeight(projection, height, object) {
+  return fit(
+    projection,
+    function(b) {
+      var h = +height,
+        k = h / (b[1][1] - b[0][1]),
+        x = -k * b[0][0],
+        y = (h - k * (b[1][1] + b[0][1])) / 2;
+      projection.scale(150 * k).translate([x, y]);
+    },
+    object
+  );
 }
 
 // The projections must have mutually exclusive clip regions on the sphere,
@@ -543,68 +571,125 @@ function albersUsaTerritories() {
 function multiplex$2(streams) {
   var n = streams.length;
   return {
-    point: function(x, y) { var i = -1; while (++i < n) {streams[i].point(x, y); }},
-    sphere: function() { var i = -1; while (++i < n) {streams[i].sphere(); }},
-    lineStart: function() { var i = -1; while (++i < n) {streams[i].lineStart(); }},
-    lineEnd: function() { var i = -1; while (++i < n) {streams[i].lineEnd(); }},
-    polygonStart: function() { var i = -1; while (++i < n) {streams[i].polygonStart(); }},
-    polygonEnd: function() { var i = -1; while (++i < n) {streams[i].polygonEnd(); }}
+    point: function(x, y) {
+      var i = -1;
+      while (++i < n) {
+        streams[i].point(x, y);
+      }
+    },
+    sphere: function() {
+      var i = -1;
+      while (++i < n) {
+        streams[i].sphere();
+      }
+    },
+    lineStart: function() {
+      var i = -1;
+      while (++i < n) {
+        streams[i].lineStart();
+      }
+    },
+    lineEnd: function() {
+      var i = -1;
+      while (++i < n) {
+        streams[i].lineEnd();
+      }
+    },
+    polygonStart: function() {
+      var i = -1;
+      while (++i < n) {
+        streams[i].polygonStart();
+      }
+    },
+    polygonEnd: function() {
+      var i = -1;
+      while (++i < n) {
+        streams[i].polygonEnd();
+      }
+    }
   };
 }
 
 // A composite projection for Spain, configured by default for 960×500.
 function conicConformalSpain() {
   var cache,
-      cacheStream,
+    cacheStream,
+    iberianPeninsule = d3Geo.geoConicConformal()
+      .rotate([5, -38.6])
+      .parallels([0, 60]),
+    iberianPeninsulePoint,
+    canaryIslands = d3Geo.geoConicConformal()
+      .rotate([5, -38.6])
+      .parallels([0, 60]),
+    canaryIslandsPoint,
+    point,
+    pointStream = {
+      point: function(x, y) {
+        point = [x, y];
+      }
+    };
 
-      iberianPeninsule = d3Geo.geoConicConformal().rotate([5, -38.6]).parallels([0,60]), iberianPeninsulePoint,
-      canaryIslands = d3Geo.geoConicConformal().rotate([5, -38.6]).parallels([0,60]), canaryIslandsPoint,
-
-      point, pointStream = {point: function(x, y) { point = [x, y]; }};
-
-      /*
+  /*
       var iberianPeninsuleBbox = [[-11, 46], [4, 35]];
       var canaryIslandsBbox = [[-19.0, 28.85], [-12.7, 28.1]];
       */
 
-  function conicConformalSpainCompact(coordinates) {
-    var x = coordinates[0], y = coordinates[1];
-    return point = null,
-        (iberianPeninsulePoint.point(x, y), point) ||
-        (canaryIslandsPoint.point(x, y), point);
+  function conicConformalSpain(coordinates) {
+    var x = coordinates[0],
+      y = coordinates[1];
+    return (
+      (point = null),
+      (iberianPeninsulePoint.point(x, y), point) ||
+        (canaryIslandsPoint.point(x, y), point)
+    );
   }
 
-  conicConformalSpainCompact.invert = function(coordinates) {
+  conicConformalSpain.invert = function(coordinates) {
     var k = iberianPeninsule.scale(),
-        t = iberianPeninsule.translate(),
-        x = (coordinates[0] - t[0]) / k,
-        y = (coordinates[1] - t[1]) / k;
+      t = iberianPeninsule.translate(),
+      x = (coordinates[0] - t[0]) / k,
+      y = (coordinates[1] - t[1]) / k;
 
-        return (y >= 0.05346 && y< 0.0897 && x >= -0.13388 && x < -0.0322 ? canaryIslands
-            : iberianPeninsule).invert(coordinates);
+    return (y >= 0.05346 && y < 0.0897 && x >= -0.13388 && x < -0.0322
+      ? canaryIslands
+      : iberianPeninsule
+    ).invert(coordinates);
   };
 
-  conicConformalSpainCompact.stream = function(stream) {
-    return cache && cacheStream === stream ? cache : cache = multiplex$2([iberianPeninsule.stream(cacheStream = stream), canaryIslands.stream(stream)]);
+  conicConformalSpain.stream = function(stream) {
+    return cache && cacheStream === stream
+      ? cache
+      : (cache = multiplex$2([
+          iberianPeninsule.stream((cacheStream = stream)),
+          canaryIslands.stream(stream)
+        ]));
   };
 
-  conicConformalSpainCompact.precision = function(_) {
-    if (!arguments.length) {return iberianPeninsule.precision();}
+  conicConformalSpain.precision = function(_) {
+    if (!arguments.length) {
+      return iberianPeninsule.precision();
+    }
     iberianPeninsule.precision(_);
     canaryIslands.precision(_);
     return reset();
   };
 
-  conicConformalSpainCompact.scale = function(_) {
-    if (!arguments.length) {return iberianPeninsule.scale();}
+  conicConformalSpain.scale = function(_) {
+    if (!arguments.length) {
+      return iberianPeninsule.scale();
+    }
     iberianPeninsule.scale(_);
     canaryIslands.scale(_);
-    return conicConformalSpainCompact.translate(iberianPeninsule.translate());
+    return conicConformalSpain.translate(iberianPeninsule.translate());
   };
 
-  conicConformalSpainCompact.translate = function(_) {
-    if (!arguments.length) {return iberianPeninsule.translate();}
-    var k = iberianPeninsule.scale(), x = +_[0], y = +_[1];
+  conicConformalSpain.translate = function(_) {
+    if (!arguments.length) {
+      return iberianPeninsule.translate();
+    }
+    var k = iberianPeninsule.scale(),
+      x = +_[0],
+      y = +_[1];
     /*
     var c0 = iberianPeninsule(iberianPeninsuleBbox[0]);
    var x0 = (x - c0[0]) / k;
@@ -627,32 +712,46 @@ function conicConformalSpain() {
    console.info('Canry Islands: p0: ' + x0 + ', ' + y0 + ' , p1: ' + x1 + ' - ' + y1);
    */
     iberianPeninsulePoint = iberianPeninsule
-        .translate(_)
-        .clipExtent([[x - 0.06857 * k, y - 0.1288 * k],[x + 0.13249 * k, y + 0.06 * k]])
-        .stream(pointStream);
+      .translate(_)
+      .clipExtent([
+        [x - 0.06857 * k, y - 0.1288 * k],
+        [x + 0.13249 * k, y + 0.06 * k]
+      ])
+      .stream(pointStream);
 
     canaryIslandsPoint = canaryIslands
-        .translate([x + 0.1 * k, y - 0.094 * k])
-        .clipExtent([[x - 0.1331 * k + epsilon, y + 0.053457 * k + epsilon],[x  - 0.0354 * k - epsilon, y + 0.08969 * k - epsilon]])
-        .stream(pointStream);
+      .translate([x + 0.1 * k, y - 0.094 * k])
+      .clipExtent([
+        [x - 0.1331 * k + epsilon, y + 0.053457 * k + epsilon],
+        [x - 0.0354 * k - epsilon, y + 0.08969 * k - epsilon]
+      ])
+      .stream(pointStream);
 
     return reset();
   };
 
-  conicConformalSpainCompact.fitExtent = function(extent, object) {
-    return fitExtent(conicConformalSpainCompact, extent, object);
+  conicConformalSpain.fitExtent = function(extent, object) {
+    return fitExtent(conicConformalSpain, extent, object);
   };
 
-  conicConformalSpainCompact.fitSize = function(size, object) {
-    return fitSize(conicConformalSpainCompact, size, object);
+  conicConformalSpain.fitSize = function(size, object) {
+    return fitSize(conicConformalSpain, size, object);
+  };
+
+  conicConformalSpain.fitWidth = function(width, object) {
+    return fitWidth(conicConformalSpain, width, object);
+  };
+
+  conicConformalSpain.fitHeight = function(height, object) {
+    return fitHeight(conicConformalSpain, height, object);
   };
 
   function reset() {
     cache = cacheStream = null;
-    return conicConformalSpainCompact;
+    return conicConformalSpain;
   }
 
-  conicConformalSpainCompact.drawCompositionBorders = function(context) {
+  conicConformalSpain.drawCompositionBorders = function(context) {
     /*
     console.info("CLIP EXTENT: ", canaryIslands.clipExtent());
     console.info("UL BBOX:", iberianPeninsule.invert([canaryIslands.clipExtent()[0][0], canaryIslands.clipExtent()[0][1]]));
@@ -660,7 +759,7 @@ function conicConformalSpain() {
     console.info("LD BBOX:", iberianPeninsule.invert([canaryIslands.clipExtent()[1][0], canaryIslands.clipExtent()[1][1]]));
     */
 
-    var ulCanaryIslands = iberianPeninsule([-14.0346750, 34.965007]);
+    var ulCanaryIslands = iberianPeninsule([-14.034675, 34.965007]);
     var urCanaryIslands = iberianPeninsule([-7.4208899, 35.536988]);
     var ldCanaryIslands = iberianPeninsule([-7.3148275, 33.54359]);
 
@@ -668,13 +767,13 @@ function conicConformalSpain() {
     context.lineTo(urCanaryIslands[0], urCanaryIslands[1]);
     context.lineTo(ldCanaryIslands[0], ldCanaryIslands[1]);
   };
-  conicConformalSpainCompact.getCompositionBorders = function() {
+  conicConformalSpain.getCompositionBorders = function() {
     var context = d3Path.path();
     this.drawCompositionBorders(context);
     return context.toString();
   };
 
-  return conicConformalSpainCompact.scale(2700);
+  return conicConformalSpain.scale(2700);
 }
 
 // The projections must have mutually exclusive clip regions on the sphere,
@@ -740,7 +839,7 @@ function conicConformalSpainCompact() {
       }
     };
 
-  function conicConformalSpain(coordinates) {
+  function conicConformalSpainCompact(coordinates) {
     var x = coordinates[0],
       y = coordinates[1];
     return (
@@ -749,7 +848,7 @@ function conicConformalSpainCompact() {
     );
   }
 
-  conicConformalSpain.invert = function(coordinates) {
+  conicConformalSpainCompact.invert = function(coordinates) {
     var k = peninsula.scale(),
       t = peninsula.translate(),
       x = (coordinates[0] - t[0]) / k,
@@ -760,7 +859,7 @@ function conicConformalSpainCompact() {
     ).invert(coordinates);
   };
 
-  conicConformalSpain.stream = function(stream) {
+  conicConformalSpainCompact.stream = function(stream) {
     return cache && cacheStream === stream
       ? cache
       : (cache = multiplex$3([
@@ -769,22 +868,22 @@ function conicConformalSpainCompact() {
         ]));
   };
 
-  conicConformalSpain.precision = function(_) {
+  conicConformalSpainCompact.precision = function(_) {
     if (!arguments.length) return peninsula.precision();
     peninsula.precision(_), canarias.precision(_);
     return reset();
   };
 
-  conicConformalSpain.scale = function(_) {
+  conicConformalSpainCompact.scale = function(_) {
     if (!arguments.length) {
       return peninsula.scale();
     }
     peninsula.scale(_);
     canarias.scale(_);
-    return conicConformalSpain.translate(peninsula.translate());
+    return conicConformalSpainCompact.translate(peninsula.translate());
   };
 
-  conicConformalSpain.translate = function(_) {
+  conicConformalSpainCompact.translate = function(_) {
     if (!arguments.length) return peninsula.translate();
     var k = peninsula.scale(),
       x = +_[0],
@@ -809,20 +908,28 @@ function conicConformalSpainCompact() {
     return reset();
   };
 
-  conicConformalSpain.fitExtent = function(extent, object) {
-    return fitExtent(conicConformalSpain, extent, object);
+  conicConformalSpainCompact.fitExtent = function(extent, object) {
+    return fitExtent(conicConformalSpainCompact, extent, object);
   };
 
-  conicConformalSpain.fitSize = function(size, object) {
-    return fitSize(conicConformalSpain, size, object);
+  conicConformalSpainCompact.fitSize = function(size, object) {
+    return fitSize(conicConformalSpainCompact, size, object);
+  };
+
+  conicConformalSpainCompact.fitWidth = function(width, object) {
+    return fitWidth(conicConformalSpainCompact, width, object);
+  };
+
+  conicConformalSpainCompact.fitHeight = function(height, object) {
+    return fitHeight(conicConformalSpainCompact, height, object);
   };
 
   function reset() {
     cache = cacheStream = null;
-    return conicConformalSpain;
+    return conicConformalSpainCompact;
   }
 
-  conicConformalSpain.drawCompositionBorders = function(context) {
+  conicConformalSpainCompact.drawCompositionBorders = function(context) {
     const extent = canarias.clipExtent();
     const ul = peninsula.invert([extent[0][0], extent[0][1]]);
     const ur = peninsula.invert([extent[1][0], extent[0][1]]);
@@ -835,13 +942,13 @@ function conicConformalSpainCompact() {
     context.lineTo(urCanaryIslands[0], urCanaryIslands[1]);
     context.lineTo(ldCanaryIslands[0], ldCanaryIslands[1]);
   };
-  conicConformalSpain.getCompositionBorders = function() {
+  conicConformalSpainCompact.getCompositionBorders = function() {
     const context = d3Path.path();
     this.drawCompositionBorders(context);
     return context.toString();
   };
 
-  return conicConformalSpain.scale(2700);
+  return conicConformalSpainCompact.scale(2700);
 }
 
 // The projections must have mutually exclusive clip regions on the sphere,
